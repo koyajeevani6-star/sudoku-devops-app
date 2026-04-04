@@ -5,6 +5,7 @@ def find_empty(board):
                 return (i, j)
     return None
 
+
 def is_valid(board, num, pos):
     row, col = pos
 
@@ -26,7 +27,24 @@ def is_valid(board, num, pos):
 
     return True
 
+
+def is_board_valid(board):
+    for row in range(9):
+        for col in range(9):
+            num = board[row][col]
+            if num != 0:
+                board[row][col] = 0
+                if not is_valid(board, num, (row, col)):
+                    board[row][col] = num
+                    return False
+                board[row][col] = num
+    return True
+
+
 def solve(board):
+    if not is_board_valid(board):
+        return False
+
     empty = find_empty(board)
     if not empty:
         return True
