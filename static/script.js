@@ -3,12 +3,84 @@ const numberPadButtons = document.querySelectorAll(".number-pad button");
 const newGameBtn = document.getElementById("new-game-btn");
 const eraseBtn = document.getElementById("erase-btn");
 const solveBtn = document.getElementById("solve-btn");
+const hintBtn = document.getElementById("hint-btn");
+const levelButtons = document.querySelectorAll(".level");
 
 let selectedCell = null;
 let seconds = 0;
+let timerInterval = null;
+let currentLevel = "easy";
+
+const solvedBoard = [
+  [9, 6, 2, 3, 7, 8, 4, 1, 5],
+  [1, 8, 5, 4, 2, 9, 7, 6, 3],
+  [3, 7, 4, 5, 6, 1, 9, 2, 8],
+  [4, 9, 6, 8, 3, 2, 1, 5, 7],
+  [2, 1, 8, 7, 4, 5, 3, 9, 6],
+  [7, 5, 3, 1, 9, 6, 2, 8, 4],
+  [5, 3, 1, 9, 8, 4, 6, 7, 2],
+  [8, 2, 7, 6, 1, 3, 5, 4, 9],
+  [6, 4, 9, 2, 5, 7, 8, 3, 1]
+];
+
+const blanksByLevel = {
+  easy: 25,
+  medium: 35,
+  hard: 45,
+  expert: 52,
+  master: 58,
+  extreme: 64
+};
+
+function deepCopyBoard(board) {
+  return board.map(row => [...row]);
+}
+
+function shuffle(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
+
+function generatePuzzle(level) {
+  const puzzle = deepCopyBoard(solvedBoard);
+  const blanks = blanksByLevel[level];
+  const positions = [];
+
+  for (let row = 0; row < 9; row++) {
+    for (let col = 0; col < 9; col++) {
+      positions.push([row, col]);
+    }
+  }
+
+  shuffle(positions);
+
+  for (let i = 0; i < blanks; i++) {
+    const [row, col] = positions[i];
+    puzzle[row][col] = 0;
+  }
+
+  return puzzle;
+}
+
+function resetTimer() {
+  clearInterval(timerInterval);
+  seconds = 0;
+  document.getElementById("timer").textContent = "00:00";
+
+  timerInterval = setInterval(() => {
+    seconds++;
+    const mins = String(Math.floor(seconds / 60)).padStart(2, "0");
+    const secs = String(seconds % 60).padStart(2, "0");
+    document.getElementById("timer").textContent = `${mins}:${secs}`;
+  }, 1000);
+}
 
 function createBoard(board) {
   boardElement.innerHTML = "";
+  selectedCell = null;
 
   for (let row = 0; row < 9; row++) {
     for (let col = 0; col < 9; col++) {
@@ -42,6 +114,27 @@ function createBoard(board) {
   }
 }
 
+function loadLevel(level) {
+  currentLevel = level;
+  const puzzle = generatePuzzle(level);
+  createBoard(puzzle);
+  resetTimer();
+}
+
+function getBoardFromUI() {
+  let board = [];
+
+  document.querySelectorAll(".cell").forEach((cell, index) => {
+    const row = Math.floor(index / 9);
+    if (!board[row]) board[row] = [];
+
+    const value = cell.textContent.trim();
+    board[row].push(value === "" ? 0 : parseInt(value));
+  });
+
+  return board;
+}
+
 numberPadButtons.forEach(button => {
   button.addEventListener("click", () => {
     if (selectedCell && !selectedCell.classList.contains("prefilled")) {
@@ -57,15 +150,7 @@ eraseBtn.addEventListener("click", () => {
 });
 
 solveBtn.addEventListener("click", async () => {
-  let board = [];
-
-  document.querySelectorAll(".cell").forEach((cell, index) => {
-    const row = Math.floor(index / 9);
-    if (!board[row]) board[row] = [];
-
-    const value = cell.textContent.trim();
-    board[row].push(value === "" ? 0 : parseInt(value));
-  });
+  const board = getBoardFromUI();
 
   try {
     const response = await fetch("/solve", {
@@ -93,18 +178,49 @@ solveBtn.addEventListener("click", async () => {
   }
 });
 
-newGameBtn.addEventListener("click", () => {
-  location.reload();
+hintBtn.addEventListener("click", async () => {
+  const board = getBoardFromUI();
+
+  try {
+    const response = await fetch("/solve", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ board: board })
+    });
+
+    const result = await response.json();
+
+    if (result.status === "solved") {
+      const cells = document.querySelectorAll(".cell");
+
+      for (let i = 0; i < cells.length; i++) {
+        if (!cells[i].classList.contains("prefilled") && cells[i].textContent.trim() === "") {
+          const row = Math.floor(i / 9);
+          const col = i % 9;
+          cells[i].textContent = result.board[row][col];
+          break;
+        }
+      }
+    } else {
+      alert("No hint available!");
+    }
+  } catch (error) {
+    console.error("Hint Error:", error);
+  }
 });
 
-function startTimer() {
-  setInterval(() => {
-    seconds++;
-    const mins = String(Math.floor(seconds / 60)).padStart(2, "0");
-    const secs = String(seconds % 60).padStart(2, "0");
-    document.getElementById("timer").textContent = `${mins}:${secs}`;
-  }, 1000);
-}
+newGameBtn.addEventListener("click", () => {
+  loadLevel(currentLevel);
+});
 
-createBoard(initialBoard);
-startTimer();
+levelButtons.forEach(button => {
+  button.addEventListener("click", () => {
+    levelButtons.forEach(btn => btn.classList.remove("active"));
+    button.classList.add("active");
+    loadLevel(button.dataset.level);
+  });
+});
+
+loadLevel("easy");

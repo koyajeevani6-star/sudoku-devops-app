@@ -68,6 +68,7 @@ body {
   align-items: center;
   cursor: pointer;
   background: #ffffff;
+  user-select: none;
 }
 
 .cell.prefilled {

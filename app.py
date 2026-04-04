@@ -9,7 +9,7 @@ def home():
 
 @app.route("/solve", methods=["POST"])
 def solve_sudoku():
-    data = request.json
+    data = request.get_json()
     board = data["board"]
 
     if solve(board):
@@ -18,4 +18,4 @@ def solve_sudoku():
         return jsonify({"status": "error"})
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=False)
